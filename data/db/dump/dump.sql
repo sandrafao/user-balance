@@ -1,0 +1,6 @@
+USE `user_balance` ;
+
+CREATE TABLE IF NOT EXISTS `users` (
+  `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  PRIMARY KEY (`id`)
+) CHARACTER SET utf8 COLLATE utf8_unicode_ci;
