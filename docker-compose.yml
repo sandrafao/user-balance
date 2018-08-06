@@ -1,6 +1,13 @@
 version: '3'
+networks:
+  default:
+    driver: bridge
 services:
   app:
     build: .
     volumes:
        - .:/usr/src/user-balance-app
+  beanstalkd:
+    build: ./docker/beanstalkd
+    ports:
+      - "11300:11300"
