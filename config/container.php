@@ -1,7 +1,11 @@
 <?php
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
+use Psr\Container\ContainerInterface;
 use UserBalanceApp\Balance\Driver\TransactionDriver;
+use UserBalanceApp\Balance\Driver\TransactionDriverInterface;
+use UserBalanceApp\Queue\QueueInterface;
+use UserBalanceApp\Queue\TransactionQueue;
 
 return [
     AMQPStreamConnection::class => function() {
@@ -12,7 +16,7 @@ return [
             getenv('RABBITMQ_DEFAULT_PASS')
         );
     },
-    TransactionDriver::class => function() {
+    TransactionDriverInterface::class => function() {
         $dsn = sprintf(
             'mysql:dbname=%s;host=%s;port=%s;charset=utf8',
             getenv('MYSQL_DATABASE'),
@@ -21,5 +25,8 @@ return [
         );
         $connection  = new \PDO($dsn, getenv('MYSQL_USER'), getenv('MYSQL_PASSWORD'));
         return new TransactionDriver($connection);
+    },
+    QueueInterface::class => function(ContainerInterface $container) {
+        return new TransactionQueue($container->get(AMQPStreamConnection::class));
     },
 ];

@@ -1,6 +1,6 @@
 <?php
 /**
- * File contains Class RunWorkerCommand
+ * File contains Class RunWorker
  *
  * @since 08.08.2018
  */
@@ -13,11 +13,11 @@ use Symfony\Component\Console\Output\OutputInterface;
 use UserBalanceApp\Worker\TransactionWorker;
 
 /**
- * Class RunWorkerCommand
+ * Class RunWorker
  *
  * @package UserBalanceApp\Command
  */
-class RunWorkerCommand extends Command
+class RunWorker extends Command
 {
     /**
      * @var TransactionWorker
