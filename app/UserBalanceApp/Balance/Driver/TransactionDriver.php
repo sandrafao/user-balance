@@ -17,13 +17,18 @@ use UserBalanceApp\Balance\Dto\WithdrawTransaction;
  *
  * @package UserBalanceApp
  */
-class TransactionDriver
+class TransactionDriver implements TransactionDriverInterface
 {
     /**
      * @var \PDO
      */
     protected $connection;
 
+    /**
+     * TransactionDriver constructor.
+     *
+     * @param PDO $connection
+     */
     public function __construct(PDO $connection)
     {
         $this->connection = $connection;

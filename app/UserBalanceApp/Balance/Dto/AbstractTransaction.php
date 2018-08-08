@@ -33,12 +33,12 @@ abstract class AbstractTransaction
      * TransactionTo constructor.
      *
      * @param int    $userIdentifier
-     * @param float  $amount
+     * @param string $amount
      */
-    public function __construct($userIdentifier, $amount)
+    public function __construct(int $userIdentifier, string $amount)
     {
-        $this->userIdentifier = (int)$userIdentifier;
-        $this->amount         = (string)$amount;
+        $this->userIdentifier = $userIdentifier;
+        $this->amount         = $amount;
     }
 
     /**
