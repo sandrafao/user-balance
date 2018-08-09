@@ -25,10 +25,11 @@ class PushTransferTransaction extends AbstractPushTransaction
     protected function prepareMessagePayload(InputInterface $input): array
     {
         return [
-            'operation' => 'transfer',
-            'userFrom' => $input->getArgument('userFrom'),
-            'userTo'   => $input->getArgument('userTo'),
-            'amount'   => $input->getArgument('amount')
+            'transaction_id' => $input->getArgument('transaction_id'),
+            'operation'      => 'transfer',
+            'userFrom'       => $input->getArgument('userFrom'),
+            'userTo'         => $input->getArgument('userTo'),
+            'amount'         => $input->getArgument('amount')
         ];
     }
 
@@ -36,8 +37,9 @@ class PushTransferTransaction extends AbstractPushTransaction
     {
         $this->setName('transaction:push:transfer')
              ->setDescription('Push transfer transaction to queue')
+             ->addArgument('transaction_id', InputArgument::REQUIRED, 'Transaction identifier')
              ->addArgument('userFrom', InputArgument::REQUIRED, 'Identifier of user from whom transfer')
              ->addArgument('userTo', InputArgument::REQUIRED, 'Identifier of user to whom transfer')
-             ->addArgument('amount', InputArgument::REQUIRED, 'Amount for tranfer');
+             ->addArgument('amount', InputArgument::REQUIRED, 'Amount for transfer');
     }
 }

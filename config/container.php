@@ -2,8 +2,14 @@
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use Psr\Container\ContainerInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
+use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use UserBalanceApp\Balance\Driver\TransactionDriver;
 use UserBalanceApp\Balance\Driver\TransactionDriverInterface;
+use UserBalanceApp\Balance\Event\Listener\SuccessTransactionListener;
+use UserBalanceApp\Balance\Event\SuccessTransactionEvent;
 use UserBalanceApp\Queue\QueueInterface;
 use UserBalanceApp\Queue\TransactionQueue;
 
@@ -29,4 +35,16 @@ return [
     QueueInterface::class => function(ContainerInterface $container) {
         return new TransactionQueue($container->get(AMQPStreamConnection::class));
     },
+    LoggerInterface::class => function() {
+        return new NullLogger();
+    },
+    EventDispatcherInterface::class => function (ContainerInterface $container) {
+        $dispatcher = new EventDispatcher();
+        $successListener = new SuccessTransactionListener($container->get(LoggerInterface::class));
+        $dispatcher->addListener(
+            SuccessTransactionEvent::NAME,
+            [$successListener, 'onSuccessTransaction']
+        );
+        return $dispatcher;
+    }
 ];

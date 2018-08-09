@@ -8,6 +8,7 @@
 namespace UserBalanceApp\Balance\Driver;
 
 use UserBalanceApp\Balance\Dto\CreditTransaction;
+use UserBalanceApp\Balance\Dto\TransferTransaction;
 use UserBalanceApp\Balance\Dto\WithdrawTransaction;
 
 /**
@@ -32,10 +33,9 @@ interface TransactionDriverInterface
     public function withdraw(WithdrawTransaction $transaction);
 
     /**
-     * @param WithdrawTransaction $withdrawTransaction
-     * @param CreditTransaction   $creditTransaction
+     * @param TransferTransaction $transaction
      *
      * @return void
      */
-    public function transfer(WithdrawTransaction $withdrawTransaction, CreditTransaction $creditTransaction);
+    public function transfer(TransferTransaction $transaction);
 }

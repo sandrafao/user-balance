@@ -4,7 +4,9 @@
         "vlucas/phpdotenv": "^2.5",
         "symfony/console": "^4.1",
         "php-di/php-di": "^6.0",
-        "mnapoli/silly": "^1.7"
+        "mnapoli/silly": "^1.7",
+        "psr/log": "^1.0",
+        "symfony/event-dispatcher": "^4.1"
     },
     "autoload": {
         "psr-4": {

@@ -25,9 +25,10 @@ class PushWithdrawTransaction extends AbstractPushTransaction
     protected function prepareMessagePayload(InputInterface $input): array
     {
         return [
-            'operation' => 'withdraw',
-            'user'      => $input->getArgument('user'),
-            'amount'    => $input->getArgument('amount')
+            'transaction_id' => $input->getArgument('transaction_id'),
+            'operation'      => 'withdraw',
+            'user'           => $input->getArgument('user'),
+            'amount'         => $input->getArgument('amount'),
         ];
     }
 
@@ -35,6 +36,7 @@ class PushWithdrawTransaction extends AbstractPushTransaction
     {
         $this->setName('transaction:push:withdraw')
              ->setDescription('Push withdraw transaction to queue')
+             ->addArgument('transaction_id', InputArgument::REQUIRED, 'Transaction identifier')
              ->addArgument('user', InputArgument::REQUIRED, 'Identifier of user to withdraw')
              ->addArgument('amount', InputArgument::REQUIRED, 'Amount for withdraw');
     }

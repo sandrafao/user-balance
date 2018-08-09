@@ -7,9 +7,16 @@
 
 namespace UserBalanceApp\Balance\Service;
 
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use UserBalanceApp\Balance\Driver\Exception\DuplicateTransaction;
 use UserBalanceApp\Balance\Driver\TransactionDriverInterface;
 use UserBalanceApp\Balance\Dto\CreditTransaction;
+use UserBalanceApp\Balance\Dto\TransferTransaction;
 use UserBalanceApp\Balance\Dto\WithdrawTransaction;
+use UserBalanceApp\Balance\Event\FailedTransactionEvent;
+use UserBalanceApp\Balance\Event\SuccessTransactionEvent;
+use UserBalanceApp\Balance\Exception\InvalidMessagePayload;
+use UserBalanceApp\Balance\Exception\RetryTransaction;
 
 /**
  * Class TransactionService
@@ -24,68 +31,125 @@ class TransactionService
     protected $driver;
 
     /**
+     * @var EventDispatcherInterface
+     */
+    protected $eventDispatcher;
+
+    /**
      * TransactionService constructor.
      *
      * @param TransactionDriverInterface $driver
+     * @param EventDispatcherInterface   $eventDispatcher
      */
-    public function __construct(TransactionDriverInterface $driver)
-    {
-        $this->driver = $driver;
+    public function __construct(
+        TransactionDriverInterface $driver,
+        EventDispatcherInterface $eventDispatcher
+    ) {
+        $this->driver          = $driver;
+        $this->eventDispatcher = $eventDispatcher;
     }
 
+    /**
+     * @param array $data
+     */
     public function runTransaction(array $data)
     {
+        $identifier = (string)$this->extractValue('transaction_id', $data);
         $operation = $this->extractValue('operation', $data);
-        if ($operation === 'credit') {
-            $this->runCreditTransaction($data);
-        } elseif ($operation === 'withdraw') {
-            $this->runWithdrawTransaction($data);
-        } elseif ($operation === 'transfer') {
-            $this->runTransferTransaction($data);
+        if ($operation === CreditTransaction::OPERATION_TYPE) {
+            $this->runCreditTransaction($identifier, $data);
+        } elseif ($operation === WithdrawTransaction::OPERATION_TYPE) {
+            $this->runWithdrawTransaction($identifier, $data);
+        } elseif ($operation === TransferTransaction::OPERATION_TYPE) {
+            $this->runTransferTransaction($identifier, $data);
         } else {
-            throw new \RuntimeException('Unsupported transaction type');
+            throw InvalidMessagePayload::unsupportedOperation($operation);
         }
     }
 
     /**
-     * @param array $data
+     * @param string $identifier
+     * @param array  $data
+     *
+     * @throws RetryTransaction
+     * @throws \Throwable
      */
-    protected function runCreditTransaction(array $data)
+    protected function runCreditTransaction(string $identifier, array $data)
     {
         $transaction = new CreditTransaction(
-            $this->extractValue('user', $data),
-            $this->extractValue('amount', $data)
+            $identifier,
+            (string)$this->extractValue('amount', $data),
+            (int)$this->extractValue('user', $data)
         );
-        $this->driver->credit($transaction);
+        try {
+            $this->driver->credit($transaction);
+        } catch (\Throwable $exception) {
+            $event = new FailedTransactionEvent($transaction);
+            $this->eventDispatcher->dispatch(FailedTransactionEvent::NAME, $event);
+            if (!$exception instanceof DuplicateTransaction) {
+                $exception = new RetryTransaction('Need to retry transaction', 0, $exception);
+            }
+            throw $exception;
+        }
+        $event = new SuccessTransactionEvent($transaction);
+        $this->eventDispatcher->dispatch(SuccessTransactionEvent::NAME, $event);
     }
 
     /**
-     * @param array $data
+     * @param string $identifier
+     * @param array  $data
+     *
+     * @throws RetryTransaction
+     * @throws \Throwable
      */
-    protected function runWithdrawTransaction(array $data)
+    protected function runWithdrawTransaction(string $identifier, array $data)
     {
         $transaction = new WithdrawTransaction(
-            $this->extractValue('user', $data),
-            $this->extractValue('amount', $data)
+            $identifier,
+            (string)$this->extractValue('amount', $data),
+            (int)$this->extractValue('user', $data)
         );
-        $this->driver->withdraw($transaction);
+        try {
+            $this->driver->withdraw($transaction);
+        } catch (\Throwable $exception) {
+            $event = new FailedTransactionEvent($transaction);
+            $this->eventDispatcher->dispatch(FailedTransactionEvent::NAME, $event);
+            if (!$exception instanceof DuplicateTransaction) {
+                $exception = new RetryTransaction('Need to retry transaction', 0, $exception);
+            }
+            throw $exception;
+        }
+        $event = new SuccessTransactionEvent($transaction);
+        $this->eventDispatcher->dispatch(SuccessTransactionEvent::NAME, $event);
     }
 
     /**
-     * @param array $data
+     * @param string $identifier
+     * @param array  $data
+     *
+     * @throws RetryTransaction
+     * @throws \Throwable
      */
-    protected function runTransferTransaction(array $data)
+    protected function runTransferTransaction(string $identifier, array $data)
     {
-        $amount = $this->extractValue('amount', $data);
-        $transactionWithdraw = new WithdrawTransaction(
-            $this->extractValue('userFrom', $data),
-            $amount
+        $transaction = new TransferTransaction(
+            $identifier,
+            (string)$this->extractValue('amount', $data),
+            (int)$this->extractValue('userFrom', $data),
+            (int)$this->extractValue('userTo', $data)
         );
-        $transactionCredit = new CreditTransaction(
-            $this->extractValue('userTo', $data),
-            $amount
-        );
-        $this->driver->transfer($transactionWithdraw, $transactionCredit);
+        try {
+            $this->driver->transfer($transaction);
+        } catch (\Throwable $exception) {
+            $event = new FailedTransactionEvent($transaction);
+            $this->eventDispatcher->dispatch(FailedTransactionEvent::NAME, $event);
+            if (!$exception instanceof DuplicateTransaction) {
+                $exception = new RetryTransaction('Need to retry transaction', 0, $exception);
+            }
+            throw $exception;
+        }
+        $event = new SuccessTransactionEvent($transaction);
+        $this->eventDispatcher->dispatch(SuccessTransactionEvent::NAME, $event);
     }
 
     /**
@@ -97,11 +161,11 @@ class TransactionService
     protected function extractValue(string $key, array $data)
     {
         if (!isset($data[$key])) {
-            throw new \RuntimeException(sprintf('Value %s is not set', $key));
+            throw InvalidMessagePayload::valueIsNotSet($key);
         }
 
         if (empty($data[$key])) {
-            throw new \RuntimeException(sprintf('Value %s is empty', $key));
+            throw InvalidMessagePayload::valueIsEmpty($key);
         }
 
         return $data[$key];

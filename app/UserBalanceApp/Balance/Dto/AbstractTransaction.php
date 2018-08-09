@@ -14,10 +14,14 @@ namespace UserBalanceApp\Balance\Dto;
  */
 abstract class AbstractTransaction
 {
+    const STATUS_NEW     = 'new';
+    const STATUS_PENDING = 'pending';
+    const STATUS_DONE    = 'done';
+
     /**
-     * @var int
+     * @var string
      */
-    protected $userIdentifier;
+    protected $identifier;
 
     /**
      * @var string
@@ -30,23 +34,28 @@ abstract class AbstractTransaction
     protected $operationType;
 
     /**
-     * TransactionTo constructor.
+     * @var string
+     */
+    protected $status;
+
+    /**
+     * AbstractTransaction constructor.
      *
-     * @param int    $userIdentifier
+     * @param string $identifier
      * @param string $amount
      */
-    public function __construct(int $userIdentifier, string $amount)
+    public function __construct(string $identifier, string $amount)
     {
-        $this->userIdentifier = $userIdentifier;
-        $this->amount         = $amount;
+        $this->identifier = $identifier;
+        $this->amount     = $amount;
     }
 
     /**
-     * @return int
+     * @return string
      */
-    public function getUserIdentifier(): int
+    public function getIdentifier(): string
     {
-        return $this->userIdentifier;
+        return $this->identifier;
     }
 
     /**
@@ -63,6 +72,25 @@ abstract class AbstractTransaction
     public function getAmountFormatted(): string
     {
         return sprintf('%0.4f', $this->getAmount());
+    }
+
+    /**
+     * @return string
+     */
+    public function getStatus(): string
+    {
+        return $this->status;
+    }
+
+    /**
+     * @param string $status
+     *
+     * @return $this
+     */
+    public function setStatus(string $status)
+    {
+        $this->status = $status;
+        return $this;
     }
 
     /**

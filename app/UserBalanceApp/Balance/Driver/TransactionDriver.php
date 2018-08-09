@@ -8,8 +8,11 @@
 namespace UserBalanceApp\Balance\Driver;
 
 use PDO;
+use UserBalanceApp\Balance\Driver\Exception\DuplicateTransaction;
+use UserBalanceApp\Balance\Driver\Exception\TransactionFailed;
 use UserBalanceApp\Balance\Dto\AbstractTransaction;
 use UserBalanceApp\Balance\Dto\CreditTransaction;
+use UserBalanceApp\Balance\Dto\TransferTransaction;
 use UserBalanceApp\Balance\Dto\WithdrawTransaction;
 
 /**
@@ -44,7 +47,7 @@ class TransactionDriver implements TransactionDriverInterface
         $this->connection->beginTransaction();
         try {
             $this->insertTransaction($transaction);
-            $this->creditBalance($transaction);
+            $this->creditBalance($transaction->getUser(), $transaction->getAmount());
             $this->connection->commit();
         } catch (\Throwable $exception) {
             $this->connection->rollBack();
@@ -62,7 +65,7 @@ class TransactionDriver implements TransactionDriverInterface
         $this->connection->beginTransaction();
         try {
             $this->insertTransaction($transaction);
-            $this->withdrawBalance($transaction);
+            $this->withdrawBalance($transaction->getUser(), $transaction->getAmount());
             $this->connection->commit();
         } catch (\Throwable $exception) {
             $this->connection->rollBack();
@@ -71,21 +74,16 @@ class TransactionDriver implements TransactionDriverInterface
     }
 
     /**
-     * @param WithdrawTransaction $withdrawTransaction
-     * @param CreditTransaction   $creditTransaction
+     * @param TransferTransaction $transaction
      *
      * @throws \Throwable
      */
-    public function transfer(
-        WithdrawTransaction $withdrawTransaction,
-        CreditTransaction $creditTransaction
-    ) {
+    public function transfer(TransferTransaction $transaction) {
         $this->connection->beginTransaction();
         try {
-            $this->insertTransaction($withdrawTransaction);
-            $this->withdrawBalance($withdrawTransaction);
-            $this->insertTransaction($creditTransaction);
-            $this->creditBalance($creditTransaction);
+            $this->insertTransaction($transaction);
+            $this->withdrawBalance($transaction->getUserFrom(), $transaction->getAmount());
+            $this->creditBalance($transaction->getUserTo(), $transaction->getAmount());
             $this->connection->commit();
         } catch (\Throwable $exception) {
             $this->connection->rollBack();
@@ -95,21 +93,40 @@ class TransactionDriver implements TransactionDriverInterface
 
     /**
      * @param AbstractTransaction $transaction
+     *
+     * @throws TransactionFailed
      */
     protected function insertTransaction(AbstractTransaction $transaction)
     {
         try {
             $query = "
-INSERT INTO `transactions` (`user_identifier`, `ammount`, `operation_type`, `created_at`)
-  VALUES (:userIdentifier, :amount, :operation, NOW())
+INSERT INTO `transactions` (`identifier`, `user_to`, `user_from`, `ammount`, `operation_type`, `status`, `created_at`)
+  VALUES (:identifier, :userTo, :userFrom, :amount, :operation, :status, NOW()) 
 ";
 
+            $userTo   = null;
+            $userFrom = null;
+            if ($transaction instanceof TransferTransaction) {
+                $userTo   = $transaction->getUserTo();
+                $userFrom = $transaction->getUserFrom();
+            } elseif ($transaction instanceof CreditTransaction) {
+                $userTo = $transaction->getUser();
+            } elseif ($transaction instanceof WithdrawTransaction) {
+                $userFrom = $transaction->getUser();
+            }
             $stmt = $this->connection->prepare($query);
-            $stmt->bindValue('userIdentifier', $transaction->getUserIdentifier(), PDO::PARAM_INT);
+            $stmt->bindValue('identifier', $transaction->getIdentifier(), PDO::PARAM_STR);
+            $stmt->bindValue('userTo', $userTo, PDO::PARAM_INT);
+            $stmt->bindValue('userFrom', $userFrom, PDO::PARAM_INT);
             $stmt->bindValue('amount', $transaction->getAmountFormatted(), PDO::PARAM_STR);
             $stmt->bindValue('operation', $transaction->getOperationType(), PDO::PARAM_STR);
+            $stmt->bindValue('status', AbstractTransaction::STATUS_NEW);
+
             $result = $stmt->execute();
             if ($result === false) {
+                if ($stmt->errorCode() === '23000') {
+                    throw DuplicateTransaction::duplicate($transaction->getIdentifier());
+                }
                 throw new \RuntimeException(
                     sprintf(
                         'Error executing statement. Code: %s. Info: %s',
@@ -118,18 +135,23 @@ INSERT INTO `transactions` (`user_identifier`, `ammount`, `operation_type`, `cre
                     )
                 );
             }
+        } catch (DuplicateTransaction $exception) {
+            throw $exception;
         } catch (\Throwable $exception) {
-            throw new \RuntimeException('Failed to save transaction operation', 0, $exception);
+            throw TransactionFailed::transactionSaveError($transaction->getIdentifier(), 0, $exception);
         }
         if ($stmt->rowCount() < 1) {
-            throw new \RuntimeException('Failed to save transaction operation');
+            throw TransactionFailed::transactionSaveError($transaction->getIdentifier());
         }
     }
 
     /**
-     * @param CreditTransaction $transaction
+     * @param int    $userIdentifier
+     * @param string $amount
+     *
+     * @throws TransactionFailed
      */
-    protected function creditBalance(CreditTransaction $transaction)
+    protected function creditBalance(int $userIdentifier, string $amount)
     {
         try {
             $query = "
@@ -139,8 +161,8 @@ INSERT INTO `user_balance` (`user_identifier`, `balance`, `last_modified`) VALUE
             $stmt = $this->connection->prepare($query);
             $result = $stmt->execute(
                 [
-                    'userIdentifier' => $transaction->getUserIdentifier(),
-                    'amount'         => $transaction->getAmountFormatted(),
+                    'userIdentifier' => $userIdentifier,
+                    'amount'         => $amount,
                 ]
             );
             if ($result === false) {
@@ -153,18 +175,21 @@ INSERT INTO `user_balance` (`user_identifier`, `balance`, `last_modified`) VALUE
                 );
             }
         } catch (\Throwable $exception) {
-            throw new \RuntimeException('Failed to credit user balance', 0, $exception);
+            throw TransactionFailed::operationFailed('credit', 0, $exception);
         }
 
         if ($stmt->rowCount() < 1) {
-            throw new \LogicException('Failed to credit user balance');
+            throw TransactionFailed::operationFailed('credit');
         }
     }
 
     /**
-     * @param WithdrawTransaction $transaction
+     * @param int    $userIdentifier
+     * @param string $amount
+     *
+     * @throws TransactionFailed
      */
-    protected function withdrawBalance(WithdrawTransaction $transaction)
+    protected function withdrawBalance(int $userIdentifier, string $amount)
     {
         try {
             $query = "
@@ -174,8 +199,8 @@ UPDATE `user_balance` SET `balance` = `balance` - :amount, `last_modified` = NOW
             $stmt = $this->connection->prepare($query);
             $result = $stmt->execute(
                 [
-                    'userIdentifier' => $transaction->getUserIdentifier(),
-                    'amount'         => $transaction->getAmountFormatted(),
+                    'userIdentifier' => $userIdentifier,
+                    'amount'         => $amount,
                 ]
             );
             if ($result === false) {
@@ -188,11 +213,11 @@ UPDATE `user_balance` SET `balance` = `balance` - :amount, `last_modified` = NOW
                 );
             }
         } catch (\Throwable $exception) {
-            throw new \RuntimeException('Failed to withdraw user balance', 0, $exception);
+            throw TransactionFailed::operationFailed('withdraw', 0, $exception);
         }
 
         if ($stmt->rowCount() < 1) {
-            throw new \LogicException('Failed to withdraw user balance');
+            throw TransactionFailed::operationFailed('withdraw');
         }
     }
 }

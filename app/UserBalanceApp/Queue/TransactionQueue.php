@@ -17,7 +17,7 @@ use PhpAmqpLib\Message\AMQPMessage;
  */
 class TransactionQueue implements QueueInterface
 {
-    const QUEUE_NAME = 'user_transaction';
+    const QUEUE_NAME = 'transaction_queue';
 
     /**
      * @var AMQPStreamConnection
@@ -42,7 +42,7 @@ class TransactionQueue implements QueueInterface
     public function push(array $payload)
     {
         $channel = $this->connection->channel();
-        $channel->queue_declare(self::QUEUE_NAME, false, false, false, false);
+        $channel->queue_declare(self::QUEUE_NAME, false, true, false, false);
 
         $message = new AMQPMessage(json_encode($payload));
         $channel->basic_publish($message, '', self::QUEUE_NAME);

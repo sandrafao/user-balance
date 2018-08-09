@@ -25,9 +25,10 @@ class PushCreditTransaction extends AbstractPushTransaction
     protected function prepareMessagePayload(InputInterface $input): array
     {
         return [
-            'operation' => 'credit',
-            'user'      => $input->getArgument('user'),
-            'amount'    => $input->getArgument('amount')
+            'transaction_id' => $input->getArgument('transaction_id'),
+            'operation'      => 'credit',
+            'user'           => $input->getArgument('user'),
+            'amount'         => $input->getArgument('amount'),
         ];
     }
 
@@ -35,6 +36,7 @@ class PushCreditTransaction extends AbstractPushTransaction
     {
         $this->setName('transaction:push:credit')
             ->setDescription('Push credit transaction to queue')
+            ->addArgument('transaction_id', InputArgument::REQUIRED, 'Transaction identifier')
             ->addArgument('user', InputArgument::REQUIRED, 'Identifier of user to credit')
             ->addArgument('amount', InputArgument::REQUIRED, 'Amount for credit');
     }

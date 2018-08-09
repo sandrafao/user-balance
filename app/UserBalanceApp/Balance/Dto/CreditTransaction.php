@@ -17,6 +17,32 @@ class CreditTransaction extends AbstractTransaction
     const OPERATION_TYPE = 'credit';
 
     /**
+     * @var int
+     */
+    protected $user;
+
+    /**
+     * CreditTransaction constructor.
+     *
+     * @param string $identifier
+     * @param string $amount
+     * @param int    $user
+     */
+    public function __construct(string $identifier, string $amount, int $user)
+    {
+        parent::__construct($identifier, $amount);
+        $this->user = $user;
+    }
+
+    /**
+     * @return int
+     */
+    public function getUser(): int
+    {
+        return $this->user;
+    }
+
+    /**
      * @return string
      */
     public function getOperationType(): string
