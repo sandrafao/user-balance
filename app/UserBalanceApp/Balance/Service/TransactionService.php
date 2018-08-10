@@ -55,6 +55,9 @@ class TransactionService
     public function runTransaction(array $data)
     {
         $identifier = (string)$this->extractValue('transaction_id', $data);
+        if ($this->driver->retryCount($identifier, 5) === false) {
+            throw new \RuntimeException('Maximum allowed retries exceeded');
+        }
         $operation = $this->extractValue('operation', $data);
         if ($operation === CreditTransaction::OPERATION_TYPE) {
             $this->runCreditTransaction($identifier, $data);
@@ -91,6 +94,7 @@ class TransactionService
             }
             throw $exception;
         }
+        $this->driver->clearRetries($transaction->getIdentifier());
         $event = new SuccessTransactionEvent($transaction);
         $this->eventDispatcher->dispatch(SuccessTransactionEvent::NAME, $event);
     }
@@ -119,6 +123,7 @@ class TransactionService
             }
             throw $exception;
         }
+        $this->driver->clearRetries($transaction->getIdentifier());
         $event = new SuccessTransactionEvent($transaction);
         $this->eventDispatcher->dispatch(SuccessTransactionEvent::NAME, $event);
     }
@@ -148,6 +153,7 @@ class TransactionService
             }
             throw $exception;
         }
+        $this->driver->clearRetries($transaction->getIdentifier());
         $event = new SuccessTransactionEvent($transaction);
         $this->eventDispatcher->dispatch(SuccessTransactionEvent::NAME, $event);
     }

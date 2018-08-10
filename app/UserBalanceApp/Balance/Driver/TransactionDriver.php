@@ -92,6 +92,47 @@ class TransactionDriver implements TransactionDriverInterface
     }
 
     /**
+     * @param string $transactionId
+     * @param int    $maxRetries
+     *
+     * @return bool
+     */
+    public function retryCount(string $transactionId, int $maxRetries): bool
+    {
+        $query = "
+INSERT INTO `retry_counter` (`transaction_id`, `retries`) VALUES (:transaction_id, 0) 
+ON DUPLICATE KEY UPDATE `retries` = `retries` + 1
+";
+        $stmt = $this->connection->prepare($query);
+        $stmt->bindValue('transaction_id', $transactionId, PDO::PARAM_STR);
+        $stmt->execute();
+
+        $query = "SELECT `retries` FROM `retry_counter` 
+WHERE `transaction_id` = :transaction_id AND `retries` < :max_retires";
+        $stmt = $this->connection->prepare($query);
+        $stmt->bindValue('transaction_id', $transactionId, PDO::PARAM_STR);
+        $stmt->bindValue('max_retires', $maxRetries, PDO::PARAM_INT);
+        $stmt->execute();
+        $result = $stmt->fetchColumn();
+        if ($result === false) {
+            $this->clearRetries($transactionId);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * @param string $transactionId
+     */
+    public function clearRetries(string $transactionId)
+    {
+        $query = "DELETE FROM `retry_counter` WHERE `transaction_id` = :transaction_id";
+        $stmt = $this->connection->prepare($query);
+        $stmt->bindValue('transaction_id', $transactionId, PDO::PARAM_STR);
+        $stmt->execute();
+    }
+
+    /**
      * @param AbstractTransaction $transaction
      *
      * @throws TransactionFailed

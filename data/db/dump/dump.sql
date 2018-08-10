@@ -20,3 +20,9 @@ CREATE TABLE IF NOT EXISTS `transactions` (
   `created_at` DATETIME NOT NULL,
   PRIMARY KEY (`id`)
 ) CHARACTER SET utf8 COLLATE utf8_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `retry_counter` (
+  `transaction_id` CHAR(100) NOT NULL,
+  `retries` INT(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`transaction_id`)
+);

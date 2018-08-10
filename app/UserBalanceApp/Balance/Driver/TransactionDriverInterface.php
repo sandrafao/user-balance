@@ -38,4 +38,19 @@ interface TransactionDriverInterface
      * @return void
      */
     public function transfer(TransferTransaction $transaction);
+
+    /**
+     * @param string $transactionId
+     * @param int    $maxRetries
+     *
+     * @return bool
+     */
+    public function retryCount(string $transactionId, int $maxRetries): bool;
+
+    /**
+     * @param string $transactionId
+     *
+     * @return void
+     */
+    public function clearRetries(string $transactionId);
 }
