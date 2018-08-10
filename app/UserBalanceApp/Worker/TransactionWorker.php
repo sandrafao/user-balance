@@ -84,6 +84,7 @@ class TransactionWorker
             echo " Error. Not requeued. {$exception->getMessage()}\n";
             return;
         }
+        echo " Message processed successfully\n";
         $message->delivery_info['channel']->basic_ack($message->delivery_info['delivery_tag']);
     }
 
